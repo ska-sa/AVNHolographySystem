@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 import struct
 
 ##### Variables to be set ###########
-gateware = "holo"
+gateware = "../GatewareBinary/holo"
 katcp_port=7147
 
 #Directory on the ROACH NFS filesystem where bof files are kept. (Assumes this is hosted on this machine.)
