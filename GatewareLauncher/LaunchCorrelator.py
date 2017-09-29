@@ -1,13 +1,4 @@
 #!/usr/bin/env python
-'''
-This script demonstrates programming an FPGA and configuring a wideband Pocket
-correlator using the Python KATCP library along with the katcp_wrapper
-distributed in the corr package. Designed for use with CASPER workshop Tutorial 4.
-\n\n
-Author: Jason Manley, August 2010.
-Modified: May 2012, Medicina.
-Modified: Aug 2012, Nie Jun
-'''
 
 import casperfpga
 import time
@@ -21,11 +12,12 @@ import matplotlib.pyplot as plt
 import struct
 
 ##### Variables to be set ###########
-gateware = "../GatewareBinary/holo"
+gateware_repo = "../GatewareBinary/"
+gateware = "holo"
 katcp_port=7147
 
 #Directory on the ROACH NFS filesystem where bof files are kept. (Assumes this is hosted on this machine.)
-roachGatewareDir = '/srv/roachfs/fs/boffiles'
+roachGatewareDir = '/srv/roachfs/fs/boffiles/'
 
 #ROACH PowerPC Network:
 strRoachIP = 'catseye'
@@ -84,7 +76,7 @@ try:
       print 'Found bof file:', gateware + '.bof'
     else:
       print 'Copying bof file', gateware + '.bof', 'to NFS (' +  roachGatewareDir + ')'
-      copyfile(gateware + '.bof', roachGatewareDir + gateware + '.bof')
+      copyfile(gateware_repo + gateware + '.bof', roachGatewareDir + gateware + '.bof')
       os.chmod(roachGatewareDir + gateware + '.bof', stat.S_IXUSR | stat.S_IXGRP |  stat.S_IXOTH)
 
     print '\n---------------------------'
@@ -101,7 +93,7 @@ try:
 
     fpga.system_info['program_filename'] = '%s.bof' % gateware #bof needs to be on the roachfs for this to work
     fpga.program()
-    fpga.get_system_information('%s.fpg' % gateware)
+    fpga.get_system_information('%s.fpg' % (gateware_repo + gateware))
     sys.stdout.flush()
 
     time.sleep(2)
