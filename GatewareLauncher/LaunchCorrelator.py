@@ -69,7 +69,7 @@ if __name__ == '__main__':
 
         print 'Flashing gateware...'
 
-        fpga.system_info['program_filename'] = '%s.bof' % gateware  # bof needs to be on the roachfs for this to work
+        fpga.system_info['program_filename'] = '%s%s.bof' % (gateware_dir, gateware)  # bof needs to be on the roachfs for this to work
         fpga.program()
         fpga.get_system_information('%s.fpg' % gateware)
         sys.stdout.flush()
