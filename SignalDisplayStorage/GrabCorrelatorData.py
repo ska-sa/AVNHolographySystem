@@ -164,7 +164,7 @@ class SubplotAnimation(animation.TimedAnimation):
             self.ax_10_ri.set_ylim(-rilim, rilim)
             self.ax_11_ri.set_ylim(-rilim, rilim)
 
-        animation.TimedAnimation.__init__(self, fig, interval=self.acc_time)
+        animation.TimedAnimation.__init__(self, fig, interval=(self.acc_time*1000))
 
     def _draw_frame(self, framedata):
         try:
