@@ -12,7 +12,8 @@ from shutil import copyfile
 import stat
 
 # #### Variables to be set ###########
-gateware = "../GatewareBinary/holo"
+gateware = "holo"
+gateware_dir = "../GatewareBinary/"
 katcp_port = 7147
 
 # Directory on the ROACH NFS filesystem where bof files are kept. (Assumes this is hosted on this machine.)
@@ -53,7 +54,7 @@ if __name__ == '__main__':
             print 'Found bof file:', gateware + '.bof'
         else:
             print 'Copying bof file', gateware + '.bof', 'to NFS (' +  roachGatewareDir + ')'
-            copyfile(gateware + '.bof', roachGatewareDir + gateware + '.bof')
+            copyfile(gateware_dir + gateware + '.bof', roachGatewareDir + gateware + '.bof')
             os.chmod(roachGatewareDir + gateware + '.bof', stat.S_IXUSR | stat.S_IXGRP |  stat.S_IXOTH)
 
         print '\n---------------------------'
