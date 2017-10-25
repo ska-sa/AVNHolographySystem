@@ -13,7 +13,7 @@ KatcpRequestFail = casperfpga.katcp_fpga.KatcpRequestFail
 strRoachIP = 'catseye'
 roachKATCPPort = 7147
 gateware = "holo"
-katcp_port=7147
+gateware_dir = "../GatewareBinary/"
 show_ri = False
 
 
@@ -22,9 +22,15 @@ class SubplotAnimation(animation.TimedAnimation):
         self.send_pipe = send_pipe
         self.f = np.arange(2048)
         self.fpga = casperfpga.katcp_fpga.KatcpFpga(strRoachIP, roachKATCPPort, timeout=10)
-        self.fpga.get_system_information('%s.fpg' % gateware)
+        self.fpga.get_system_information('%s%s.fpg' % (gateware_dir, gateware))
         self.show_ri = show_ri
         fig = plt.figure(figsize=figsize)
+
+        # Populate some things
+        self.start_time = self.fpga.registers.start_time_int.read()["data"]["reg"] +\
+                          self.fpga.registers.start_time_frac.read()["data"]["reg"]
+        self.acc_len = self.fpga.registers.acc_len.read()["data"]["reg"]
+        self.acc_time = self.acc_len * 122.88e-6
 
         if self.show_ri:
             pos_00_mp = 241
@@ -154,7 +160,7 @@ class SubplotAnimation(animation.TimedAnimation):
             self.ax_10_ri.set_ylim(-rilim, rilim)
             self.ax_11_ri.set_ylim(-rilim, rilim)
 
-        animation.TimedAnimation.__init__(self, fig, interval=1010)
+        animation.TimedAnimation.__init__(self, fig, interval=self.acc_time)
 
     def _draw_frame(self, framedata):
         try:
@@ -193,7 +199,15 @@ class SubplotAnimation(animation.TimedAnimation):
             p10_i = np.zeros(2048)
         p10 = p10_r + 1j*p10_i
 
-        self.send_pipe.send((p00, p01, p10, p11))
+        try:
+            timestamp = self.fpga.registers.acc_timestamp.read()["data"]["reg"]
+        except KatcpRequestFail:
+            print "Couldn't get timestamp."
+            timestamp = 0
+        timestamp *= self.acc_time
+        timestamp += self.start_time
+
+        self.send_pipe.send((p00, p01, p10, p11, timestamp))
 
         p00_dB = 10 * np.log10(np.abs(p00))
         p01_dB = 10 * np.log10(np.abs(p01))
@@ -230,10 +244,8 @@ class SubplotAnimation(animation.TimedAnimation):
             self._drawn_artists = [self.line_00_m, self.line_01_m, self.line_10_m, self.line_11_m,
                                    self.line_00_p, self.line_01_p, self.line_10_p, self.line_11_p]
 
-
     def new_frame_seq(self):
         return iter(range(self.f.size))
-
 
     def _init_draw(self):
         if self.show_ri:
@@ -252,7 +264,6 @@ class h5recorder(object):
     def __init__(self, recv_pipe):
         self.recv_pipe = recv_pipe
 
-
     def record_data(self, recv_pipe):
         record = True
         datafile = h5py.File("%s.h5"%(time.strftime("%Y.%m.%d-%H.%M.%S", time.gmtime())), "w")
@@ -266,7 +277,6 @@ class h5recorder(object):
                 print "Poison pill received. Stopping..."
                 record = False
             else:
-                timestamp = time.time()
                 received_data += 1
                 print "Received %d accumulations." % received_data
                 current_size = timestamps.size
@@ -280,7 +290,7 @@ class h5recorder(object):
                 vis_data[current_size,:,3,0] = np.real(data[3])
                 vis_data[current_size,:,3,1] = np.imag(data[3])
                 timestamps.resize((current_size+1,))
-                timestamps[current_size] = timestamp
+                timestamps[current_size] = data[4]
         print "Broken out of while loop. Process stopped."
         datafile.close()
 
