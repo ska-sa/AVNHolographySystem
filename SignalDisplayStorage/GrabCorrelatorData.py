@@ -23,14 +23,18 @@ class SubplotAnimation(animation.TimedAnimation):
         self.f = np.arange(2048)
         self.fpga = casperfpga.katcp_fpga.KatcpFpga(strRoachIP, roachKATCPPort, timeout=10)
         self.fpga.get_system_information('%s%s.fpg' % (gateware_dir, gateware))
+        print "FPGA connected."
         self.show_ri = show_ri
         fig = plt.figure(figsize=figsize)
 
         # Populate some things
         self.start_time = self.fpga.registers.start_time_int.read()["data"]["reg"] +\
                           self.fpga.registers.start_time_frac.read()["data"]["reg"]
+        print "Correlator started at: ", time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(self.start_time))
         self.acc_len = self.fpga.registers.acc_len.read()["data"]["reg"]
+        print "Correlator accumulation length: ", self.acc_len
         self.acc_time = self.acc_len * 122.88e-6
+        print "Correlator accumulation time: ", self.acc_time
 
         if self.show_ri:
             pos_00_mp = 241
