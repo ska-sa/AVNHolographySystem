@@ -72,7 +72,7 @@ def fs_to_kp_pointing_model(pmodl_file):
         raise TypeError("%s not correct format for pointing model file." % (repr(pmodl_file)))
     # The first number on the line is the phi value
     phi = float(params_implemented[0])
-    
+
     # If any of the higher ones are used, throw a warning:
     # TODO: figure out how to do this properly in Python. There must be a prettier way.
     if params_implemented[23] == '1' or \
