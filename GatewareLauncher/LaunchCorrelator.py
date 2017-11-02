@@ -19,12 +19,11 @@ katcp_port = 7147
 # Directory on the ROACH NFS filesystem where bof files are kept. (Assumes this is hosted on this machine.)
 roachGatewareDir = '/srv/roachfs/fs/boffiles'
 
-# ROACH PowerPC Network:
-strRoachIP = 'catseye'
+#ROACH PowerPC Network:
+strRoachIP = '192.168.0.20'
 roachKATCPPort = 7147
-acc_len = 8137  # This is ever so slightly less than 1 second.
-ADCAttenuation = 2
-
+acc_len = 1024  # This is about 1/4 of a second. Roughly.
+ADCAttenuation = 63
 
 def exit_fail():
     print 'FAILURE DETECTED.'
@@ -44,19 +43,6 @@ def exit_clean():
 
 
 if __name__ == '__main__':
-    try:
-        print '\n---------------------------'
-        print 'Checking gateware...'
-        if not(roachGatewareDir.endswith('/')):
-            roachGatewareDir += '/'
-
-        if os.path.isfile(roachGatewareDir + gateware + '.bof'):
-            print 'Found bof file:', gateware + '.bof'
-        else:
-            print 'Copying bof file', gateware + '.bof', 'to NFS (' +  roachGatewareDir + ')'
-            copyfile(gateware_dir + gateware + '.bof', roachGatewareDir + gateware + '.bof')
-            os.chmod(roachGatewareDir + gateware + '.bof', stat.S_IXUSR | stat.S_IXGRP |  stat.S_IXOTH)
-
         print '\n---------------------------'
         print 'Connecting to FPGA...'
         fpga = casperfpga.katcp_fpga.KatcpFpga(strRoachIP, roachKATCPPort, timeout=10)
@@ -91,6 +77,3 @@ if __name__ == '__main__':
         fpga.registers.start_time_frac.write(reg=start_time_frac)
 
         print "Correlator setup complete."
-
-    except KeyboardInterrupt:
-        exit_clean()
