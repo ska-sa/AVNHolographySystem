@@ -22,7 +22,7 @@ roachGatewareDir = '/srv/roachfs/fs/boffiles'
 #ROACH PowerPC Network:
 strRoachIP = '192.168.0.20'
 roachKATCPPort = 7147
-acc_len = 1024  # This is about 1/4 of a second. Roughly.
+acc_len = 1024  # This is about 1/8 of a second. Roughly.
 ADCAttenuation = 63
 
 def exit_fail():
