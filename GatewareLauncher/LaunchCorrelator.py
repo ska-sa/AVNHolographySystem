@@ -22,7 +22,7 @@ roachGatewareDir = '/srv/roachfs/fs/boffiles'
 # ROACH PowerPC Network:
 strRoachIP = 'catseye'
 roachKATCPPort = 7147
-acc_len = 8137  # This is ever so slightly less than 1 second.
+acc_len = 1024  # This is about 1/8 of a second. More or less.
 ADCAttenuation = 2
 
 
