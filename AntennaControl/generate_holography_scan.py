@@ -99,7 +99,7 @@ if __name__ == "__main__":
     myTarget.antenna = antenna
     d_az, d_el, t, comment = generate_raster(raster_size_az, raster_size_el)
 
-    print len(d_az), len(t), len(comment)
+    #print len(d_az), len(t), len(comment)
 
     with open("%s.snp" % output_filename, "w") as output_file:
         output_file.write("\" Holography raster script developed 2017-07-19 by James Smith.\n")
@@ -123,4 +123,6 @@ if __name__ == "__main__":
         plt.ylim(np.min(x) - 0.5, np.max(x) + 0.5)
         my_line, = plt.plot([], [], '.')
         line_ani = anim.FuncAnimation(fig, update_line, len(x), fargs=(data, my_line), interval=50, blit=True, repeat=False)
+
+        line_ani.save("holog_scan.gif", writer="imagemagick")
         plt.show()
