@@ -10,7 +10,7 @@ import h5py
 
 KatcpRequestFail = casperfpga.katcp_fpga.KatcpRequestFail
 
-strRoachIP = '192.168.0.20'
+strRoachIP = '192.168.0.21'
 roachKATCPPort = 7147
 gateware = "holo"
 gateware_dir = "../GatewareBinary/"
@@ -21,7 +21,7 @@ class SubplotAnimation(animation.TimedAnimation):
     def __init__(self, send_pipe, show_ri=False, figsize=(22,12)):
         self.send_pipe = send_pipe
         self.f = np.arange(2048)
-        self.fpga = casperfpga.katcp_fpga.KatcpFpga(strRoachIP, roachKATCPPort, timeout=10)
+        self.fpga = casperfpga.katcp_fpga.KatcpFpga(strRoachIP, roachKATCPPort, timeout=1)
         self.fpga.get_system_information('%s%s.fpg' % (gateware_dir, gateware))
         print "FPGA connected."
         self.show_ri = show_ri
@@ -34,6 +34,7 @@ class SubplotAnimation(animation.TimedAnimation):
         self.acc_len = self.fpga.registers.acc_len.read()["data"]["reg"]
         print "Correlator accumulation length: ", self.acc_len
         self.acc_time = self.acc_len * 122.88e-6
+        #self.acc_time = self.acc_len * 0.00012435456
         print "Correlator accumulation time: ", self.acc_time
 
         if self.show_ri:
@@ -118,10 +119,10 @@ class SubplotAnimation(animation.TimedAnimation):
         self.line_10_m, = self.ax_10_m.plot([], [], color="blue", label="mag")
         self.line_11_m, = self.ax_11_m.plot([], [], color="blue", label="mag")
 
-        self.line_00_p, = self.ax_00_p.plot([], [], color="red", label="phase")
-        self.line_01_p, = self.ax_01_p.plot([], [], color="red", label="phase")
-        self.line_10_p, = self.ax_10_p.plot([], [], color="red", label="phase")
-        self.line_11_p, = self.ax_11_p.plot([], [], color="red", label="phase")
+        self.line_00_p, = self.ax_00_p.plot([], [], '.', color="red", label="phase")
+        self.line_01_p, = self.ax_01_p.plot([], [], '.', color="red", label="phase")
+        self.line_10_p, = self.ax_10_p.plot([], [], '.', color="red", label="phase")
+        self.line_11_p, = self.ax_11_p.plot([], [], '.', color="red", label="phase")
 
         if self.show_ri:
             self.line_00_r, = self.ax_00_ri.plot([], [], color="cyan", label="real")
@@ -134,18 +135,25 @@ class SubplotAnimation(animation.TimedAnimation):
             self.line_10_i, = self.ax_10_ri.plot([], [], color="magenta", label="imag")
             self.line_11_i, = self.ax_11_ri.plot([], [], color="magenta", label="imag")
 
-        self.ax_00_m.set_xlim(0,2048)
-        self.ax_01_m.set_xlim(0,2048)
-        self.ax_10_m.set_xlim(0,2048)
-        self.ax_11_m.set_xlim(0,2048)
+        if True:
+            self.ax_00_m.set_xlim(650, 660)
+            self.ax_01_m.set_xlim(650, 660)
+            self.ax_10_m.set_xlim(650, 660)
+            self.ax_11_m.set_xlim(650, 660)
+
+        if False:
+            self.ax_00_m.set_xlim(0, 2048)
+            self.ax_01_m.set_xlim(0, 2048)
+            self.ax_10_m.set_xlim(0, 2048)
+            self.ax_11_m.set_xlim(0, 2048)
 
         if self.show_ri:
-            self.ax_00_ri.set_xlim(0,2048)
-            self.ax_01_ri.set_xlim(0,2048)
-            self.ax_10_ri.set_xlim(0,2048)
-            self.ax_11_ri.set_xlim(0,2048)
+            self.ax_00_ri.set_xlim(0, 2048)
+            self.ax_01_ri.set_xlim(0, 2048)
+            self.ax_10_ri.set_xlim(0, 2048)
+            self.ax_11_ri.set_xlim(0, 2048)
 
-        mlim = 60
+        mlim = 80
         self.ax_00_m.set_ylim(0, mlim)
         self.ax_01_m.set_ylim(0, mlim)
         self.ax_10_m.set_ylim(0, mlim)
@@ -204,12 +212,17 @@ class SubplotAnimation(animation.TimedAnimation):
         p10 = p10_r + 1j*p10_i
 
         try:
-            timestamp = self.fpga.registers.acc_timestamp.read()["data"]["reg"]
+            timestamp = float(self.fpga.registers.acc_timestamp.read()["data"]["reg"])
         except KatcpRequestFail:
             print "Couldn't get timestamp."
-            timestamp = 0
+            timestamp = 0.0
+        #print "\nTimestamp received: ", timestamp
+        timestamp /= self.acc_len
+        #print "Timestamp divided by acc len: ", timestamp, self.acc_len
         timestamp *= self.acc_time
+        #print "Timestamp multiplied by acc time: ", timestamp, self.acc_time
         timestamp += self.start_time
+        #print "Timestamp added to start time: ", timestamp, self.start_time
 
         self.send_pipe.send((p00, p01, p10, p11, timestamp))
 
@@ -270,10 +283,11 @@ class h5recorder(object):
 
     def record_data(self, recv_pipe):
         record = True
-        datafile = h5py.File("%s.h5"%(time.strftime("%Y.%m.%d-%H.%M.%S", time.gmtime())), "w")
+        datafile = h5py.File("%s.h5" % (time.strftime("%Y.%m.%d-%H.%M.%S", time.gmtime())), "w")
         data_group = datafile.create_group("Data")
         vis_data = data_group.create_dataset("VisData", (0, 2048, 4, 2), maxshape=(None, 2048, 4, 2), dtype="f4")
-        timestamps = data_group.create_dataset("Timestamps", (0,), maxshape=(None,), dtype="f4")
+        timestamps = data_group.create_dataset("Timestamps", (0,), maxshape=(None,), dtype="f8")
+        pc_timestamps = data_group.create_dataset("PC Timestamps", (0,), maxshape=(None,), dtype="f8")
         received_data = 0
         while record:
             data = recv_pipe.recv()
@@ -284,17 +298,21 @@ class h5recorder(object):
                 received_data += 1
                 print "Received %d accumulations." % received_data
                 current_size = timestamps.size
-                vis_data.resize((current_size+1, 2048,4,2))
-                vis_data[current_size,:,0,0] = np.real(data[0])
-                vis_data[current_size,:,0,1] = np.imag(data[0])
-                vis_data[current_size,:,1,0] = np.real(data[1])
-                vis_data[current_size,:,1,1] = np.imag(data[1])
-                vis_data[current_size,:,2,0] = np.real(data[2])
-                vis_data[current_size,:,2,1] = np.imag(data[2])
-                vis_data[current_size,:,3,0] = np.real(data[3])
-                vis_data[current_size,:,3,1] = np.imag(data[3])
+                vis_data.resize((current_size+1, 2048, 4, 2))
+                vis_data[current_size, :, 0, 0] = np.real(data[0])
+                vis_data[current_size, :, 0, 1] = np.imag(data[0])
+                vis_data[current_size, :, 1, 0] = np.real(data[1])
+                vis_data[current_size, :, 1, 1] = np.imag(data[1])
+                vis_data[current_size, :, 2, 0] = np.real(data[2])
+                vis_data[current_size, :, 2, 1] = np.imag(data[2])
+                vis_data[current_size, :, 3, 0] = np.real(data[3])
+                vis_data[current_size, :, 3, 1] = np.imag(data[3])
                 timestamps.resize((current_size+1,))
                 timestamps[current_size] = data[4]
+                pc_timestamps.resize((current_size+1,))
+                pc_timestamps[current_size] = time.time()
+                print "Delta in timestamps between ROACH and PC: ", timestamps[-1] - pc_timestamps[-1]
+
         print "Broken out of while loop. Process stopped."
         datafile.close()
 

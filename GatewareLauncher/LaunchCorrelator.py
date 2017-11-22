@@ -19,10 +19,11 @@ katcp_port = 7147
 roachGatewareDir = '/srv/roachfs/fs/boffiles'
 
 #ROACH PowerPC Network:
-strRoachIP = '192.168.0.20'
+strRoachIP = '192.168.0.21'
 roachKATCPPort = 7147
-acc_len = 1024  # This is about 1/8 of a second. Roughly.
-ADCAttenuation = 63
+acc_len = 4096  # This is about 1/8 of a second. Roughly.
+ADCAttenuation = 10
+digitalGain = 32
 
 def exit_fail():
     print 'FAILURE DETECTED.'
@@ -67,6 +68,8 @@ if __name__ == '__main__':
         print "Activating ADCs..."
         fpga.registers.adc_ctrl.write(en0=True, atten0=ADCAttenuation, en1=True, atten1=ADCAttenuation)
         fpga.registers.acc_len.write(reg=acc_len)
+        fpga.registers.gain0.write(reg=digitalGain)
+        fpga.registers.gain1.write(reg=digitalGain)
         fpga.registers.control.write(sys_rst=False)
 
         start_time = time.time()
