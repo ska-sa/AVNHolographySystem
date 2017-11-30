@@ -24,7 +24,7 @@ target_dec = float(raw_input("Enter target declination (degrees): "))
 data_column = np.array(h5_file["Data/VisData"][:,channel_num,pol_selection,0] + 1j*h5_file["Data/VisData"][:,channel_num,pol_selection,1])
 
 # Convert from MJD to Unix time
-csv_mjd = np.array(csv_file["# MJD"])
+csv_mjd = np.array(csv_file["MJD"])
 csv_timestamps = np.zeros(len(csv_mjd), dtype=np.float)
 for i in range(len(csv_mjd)):
     t = Time(csv_mjd[i], format="mjd")
@@ -45,12 +45,35 @@ new_hourangle = hourangle_interpolator(h5_timestamps)
 declination_interpolator = interpolate.interp1d(csv_timestamps, np.array(csv_file["Dec"]), kind="cubic")
 new_declination = declination_interpolator(h5_timestamps)
 
+labels = []
+for i in range(len(h5_timestamps)):
+    idx = np.abs(csv_timestamps - h5_timestamps[i]).argmin()
+    labels.append(csv_file["Label"][idx])
+
+# Try to rework the labelling a bit.
+previous_scan_index = 0
+previous_label = "None"
+for i in range(len(labels)):
+    if labels[i] == "Scan" and previous_label == "Scan":
+        previous_scan_index = i
+    elif labels[i] != "Scan" and previous_label != "Scan":
+        pass
+    elif labels[i] == "Scan" and previous_label != "Scan":
+        if i - previous_scan_index > 30:
+            pass
+        else:
+            for j in range(previous_scan_index, i + 1):
+                labels[j] = "Scan"
+        previous_scan_index = i
+    previous_label = labels[i]
+
 # Find the right lines in the csv log file.
 with open("output_file.asc", "w") as output_file:
     output_file.write("#freq_MHz=%.4f\n" % freq)
     output_file.write("#targetha_deg=%.4f\n" % target_ha)
     output_file.write("#targetdec_deg=%.4f\n" % target_dec)
+
     for i in range(len(h5_timestamps)):
-        output_file.write("%.6f\t%.6f\t%.6f\t%.6f\t%.2f\n" %
+        output_file.write("%.6f\t%.6f\t%.6f\t%.6f\t%.2f\t%s\n" %
                           (new_hourangle[i] - target_ha, new_declination[i] - target_dec,
-                           np.abs(data_column[i]), np.degrees(np.angle(data_column[i])), h5_timestamps[i]))
+                           np.abs(data_column[i]), np.degrees(np.angle(data_column[i])), h5_timestamps[i], labels[i]))

@@ -19,7 +19,7 @@ katcp_port = 7147
 roachGatewareDir = '/srv/roachfs/fs/boffiles'
 
 #ROACH PowerPC Network:
-strRoachIP = '192.168.0.21'
+strRoachIP = '192.168.33.10'
 roachKATCPPort = 7147
 acc_len = 4096  # This is about 1/8 of a second. Roughly.
 ADCAttenuation = 10
