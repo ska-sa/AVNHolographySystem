@@ -10,7 +10,7 @@ import h5py
 
 KatcpRequestFail = casperfpga.katcp_fpga.KatcpRequestFail
 
-strRoachIP = '192.168.33.10'
+strRoachIP = '192.168.0.20'
 roachKATCPPort = 7147
 gateware = "holo"
 gateware_dir = "../GatewareBinary/"
