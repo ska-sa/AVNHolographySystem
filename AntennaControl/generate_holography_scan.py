@@ -17,7 +17,7 @@ start_time_input = "2018-03-01 14:00:00"
 output_filename = "output"
 
 
-def generate_raster(total_extent_az, total_extent_el, az_resolution=0.05, el_resolution=0.05, dwell_time=10,
+def generate_raster(total_extent_az, total_extent_el, az_resolution=0.05, el_resolution=0.05, dwell_time=30,
                     n_slew_points=5, slew_speed=0.02, scan_speed=0.01):
     """All angle values in degrees, speed values in degrees per second.
     """
@@ -32,6 +32,7 @@ def generate_raster(total_extent_az, total_extent_el, az_resolution=0.05, el_res
     if n_scans % 2 == 0:
         n_scans += 1
 
+    # Create a grid, then arrange in a scan pattern.
     y_space = np.linspace(-total_extent_el/2, total_extent_el/2, n_scans, endpoint=True)
     x_space = np.linspace(-total_extent_az/2, total_extent_az/2, n_points_per_scan, endpoint=False)
 
@@ -40,8 +41,9 @@ def generate_raster(total_extent_az, total_extent_el, az_resolution=0.05, el_res
     time_points = np.array([dwell_time])
     label = ["track"]
 
+    # Numpy arrays don't have an append() fundction so concatenate is the next best thing.
+    # Not great from a performance perspective, but it's a small script so it should be fine.
     for ui in range(n_scans):
-        # Time: the division is making a lot of zeros.
         # Slew to the start of the next scan
         x_points = np.concatenate((x_points,
                                    np.linspace(x_points[-1], x_space[0], n_slew_points + 1, endpoint=False)[1:]))
@@ -67,25 +69,21 @@ def generate_raster(total_extent_az, total_extent_el, az_resolution=0.05, el_res
         for j in range(n_slew_points):
             label.append("slew")
 
+        # Dwell on the target for a while.
         x_points = np.concatenate((x_points, [0]))
         y_points = np.concatenate((y_points, [0]))
         time_points = np.concatenate((time_points, [dwell_time]))
         label.append("track")
 
+    # Cumsum requires a reasonably up-to-date numpy. It makes a cumulative sum of the numbers in the vector,
+    # which allows this just to be added to the start time and have correct absolute times for the whole sequence.
     time_points = np.cumsum(time_points)
-    time_points -= time_points[0]
+    time_points -= time_points[0] # Because first time-stamp is zero relative to start time.
 
     return x_points, y_points, time_points, label
 
 
-def update_line(num, line_data, line):
-    line.set_data(line_data[..., :num])
-    return line,
-
-
 if __name__ == "__main__":
-
-    # target_az, target_el = float(args[0]), float(args[1])
 
     try:
         start_time = calendar.timegm(time.strptime(start_time_input, "%Y-%m-%d %H:%M:%S"))
@@ -93,11 +91,7 @@ if __name__ == "__main__":
         print "Either start date or time are incorrectly formatted. Use format: 2001-09-11 09:57:55"
         exit(-1)
 
-
     myTarget = katpoint.Target("%s, tle, %s" % (satellite_name, TLE))
-
-    # noinspection PyTypeChecker
-    # myTarget = katpoint.construct_azel_target(np.radians(target_az), np.radians(target_el))
     antenna = katpoint.Antenna(antenna_str)
     myTarget.antenna = antenna
     d_az, d_el, t, comment = generate_raster(raster_size_az, raster_size_el)
