@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as anim
 import time
+import calendar # for the one timegm function...
 import katpoint
 
 # Edit these before each run.
@@ -18,6 +19,10 @@ output_filename = "output"
 
 def generate_raster(total_extent_az, total_extent_el, az_resolution=0.05, el_resolution=0.05, dwell_time=10,
                     n_slew_points=5, slew_speed=0.02, scan_speed=0.01):
+    """All angle values in degrees, speed values in degrees per second.
+    """
+
+    # These need to be forced as floats, otherwise integer division can bite you in the bum.
     total_extent_az = float(total_extent_az)
     total_extent_el = float(total_extent_el)
     slew_time = float(total_extent_az) / 2 / slew_speed
@@ -83,7 +88,7 @@ if __name__ == "__main__":
     # target_az, target_el = float(args[0]), float(args[1])
 
     try:
-        start_time = time.mktime(time.strptime(start_time_input, "%Y-%m-%d %H:%M:%S"))
+        start_time = calendar.timegm(time.strptime(start_time_input, "%Y-%m-%d %H:%M:%S"))
     except ValueError:
         print "Either start date or time are incorrectly formatted. Use format: 2001-09-11 09:57:55"
         exit(-1)
@@ -105,14 +110,16 @@ if __name__ == "__main__":
                           % time.strftime("%Y-%m-%d %H:%M:%S"))
         output_file.write("\" File: %s.snp\n" % output_filename)
         output_file.write("\" Target: %s\n" % repr(myTarget))
+        output_file.write("\" Target nominal az/el: %.2f, %.2f\n" % (np.degrees(myTarget.azel(start_time)[0]),
+                                                                     np.degrees(myTarget.azel(start_time)[1])))
         output_file.write("\" Raster size: %.2f x %.2f degrees\n" % (raster_size_az, raster_size_el))
         output_file.write("\" Schedule to start at: %s\n" % start_time_input)
         for i in range(len(d_az)):
             output_file.write("\"#%d,%s,nominal\n!%s\nsource=azel,%.6fd,%.6fd\n" %
                               (start_time + t[i], comment[i],
                                time.strftime("%Y.%j.%H:%M:%S", time.gmtime(start_time + t[i])),
-                               myTarget.azel(start_time + t[i])[0] + d_az[i],
-                               myTarget.azel(start_time + t[i])[1] + d_el[i]))
+                               np.degrees(myTarget.azel(start_time + t[i])[0]) + d_az[i],
+                               np.degrees(myTarget.azel(start_time + t[i])[1]) + d_el[i]))
             xy = myTarget.sphere_to_plane(np.radians(myTarget.azel(start_time + t[i])[0] + d_az[i]),
                                           np.radians(myTarget.azel(start_time + t[i])[1] + d_el[i]))
             x.append(np.degrees(xy[0]))
