@@ -3,31 +3,36 @@ import numpy as np
 import pandas as pd
 import sys
 import katpoint
+import scipy.interpolate as interpolate
 
+# Filenames from arguments
 h5_filename = sys.argv[1]
 csv_filename = sys.argv[2]
+snp_filename = sys.argv[3]
+pmodl_filename = sys.argv[4]
 # Let's make the pmodl file optional...
 try:
-    pmodl_file = open(sys.argv[3], "r")
+    pmodl_file = open(pmodl_filename, "r")
 except IndexError:
     print "Warning! No pmodl file supplied, using a default zero one."
     pmodl_file = None
 except IOError:
-    print "Error! %s doesn't exist, using zero pointing model." % sys.argv[3]
+    print "Error! %s doesn't exist, using zero pointing model." % pmodl_filename
     pmodl_file = None
 h5_file = h5py.File(h5_filename)
 csv_file = pd.read_csv(csv_filename, skipinitialspace=True)
 
+#TODO: make this not a raw_input thing, it's messy.
 channel_num = int(raw_input("Please enter the channel number: "))
 freq = float(raw_input("Enter the frequency (MHz) of the target: "))
 pol_selection = int(raw_input("1 for AUTxRef, 2 for RefXAUT: "))
-target_az = float(raw_input("Enter target azimuth (degrees): "))
-target_el = float(raw_input("Enter target elevation (degrees): "))
 
-data_column = np.array(h5_file["Data/VisData"][:,channel_num,pol_selection,0] + 1j*h5_file["Data/VisData"][:,channel_num,pol_selection,1])
+data_column = np.array(h5_file["Data/VisData"][:,channel_num,pol_selection,0]
+                       + 1j*h5_file["Data/VisData"][:,channel_num,pol_selection,1])
 
 csv_timestamps = np.array(csv_file["Timestamp"])
 h5_timestamps = np.array(h5_file["Data/Timestamps"])
+
 
 # This cut straight from my previous Katdal work.
 # Should probably get around to modularising that properly.
@@ -45,6 +50,7 @@ def decdeg2dms(dd):
         else:
             seconds = -seconds
     return int(degrees), int(minutes), float(seconds)
+
 
 def fs_to_kp_pointing_model(pmodl_file):
     """Parses a Field System pointing model file (mdlpo.ctl)
@@ -118,9 +124,22 @@ pmodl_set = fs_to_kp_pointing_model(pmodl_file)
 antenna_str = "ant1, 5:45:2.48, -0:18:17.92, 116, 32.0, 0 0 0, %s" % (pmodl_set[0])
 pmodl_set = np.array(pmodl_set[1:]).transpose()
 antenna = katpoint.Antenna(antenna_str)
-target = katpoint.Target("Satellite,azel,%.6f,%.6f" % (target_az, target_el))
+satellite_name = "Eutelsat 7A"
+TLE = """EUTELSAT 7A
+1 28187U 04008A   18051.18726536  .00000042  00000-0  00000+0 0  9996
+2 28187   0.0701 342.3392 0003208 340.3981 261.7175  1.00271618 51105"""
+target = katpoint.Target("%s, tle, %s" % (satellite_name, TLE))
 target.antenna = antenna
 
+# TODO: check for limits.
+
+# Interpolate CSV data onto RF data:
+az_interpolator = interpolate.interp1d(csv_timestamps, np.array(csv_file["Azim actual position"]), kind="cubic")
+csv_az = az_interpolator(h5_timestamps)
+el_interpolator = interpolate.interp1d(csv_timestamps, np.array(csv_file["Elev actual position"]), kind="cubic")
+csv_el = el_interpolator(h5_timestamps)
+
+# TODO: Flagging. Don't have any of that yet.
 
 # Find the right lines in the csv log file.
 with open("output_file.asc", "w") as output_file:
@@ -128,9 +147,8 @@ with open("output_file.asc", "w") as output_file:
     output_file.write("#targetaz_deg=%.4f\n" % target_az)
     output_file.write("#targetel_deg=%.4f\n" % target_el)
     for i in range(len(h5_timestamps)):
-        idx = np.abs(csv_timestamps - h5_timestamps[i]).argmin()
-        azel = np.degrees(antenna.pointing_model.reverse(np.radians(csv_file["Azim actual position"][idx]),
-                                                         np.radians(csv_file["Elev actual position"][idx])))
+        azel = np.degrees(antenna.pointing_model.reverse(np.radians(csv_az[i]),
+                                                         np.radians(csv_el[i])))
         output_file.write("%.6f\t%.6f\t%.6f\t%.6f\t%.2f\n" %
                           (azel[0] - target_az, azel[1] - target_el,
                            np.abs(data_column[i]), np.degrees(np.angle(data_column[i])), h5_timestamps[i]))
