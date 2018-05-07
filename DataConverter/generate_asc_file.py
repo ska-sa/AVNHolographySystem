@@ -9,9 +9,10 @@ import scipy.interpolate as interpolate
 h5_filename = sys.argv[1]
 csv_filename = sys.argv[2]
 snp_filename = sys.argv[3]
-pmodl_filename = sys.argv[4]
+
 # Let's make the pmodl file optional...
 try:
+    pmodl_filename = sys.argv[4]
     pmodl_file = open(pmodl_filename, "r")
 except IndexError:
     print "Warning! No pmodl file supplied, using a default zero one."
