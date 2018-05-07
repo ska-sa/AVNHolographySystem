@@ -6,13 +6,13 @@ import katpoint
 import scipy.interpolate as interpolate
 
 # Filenames from arguments
-h5_filename = sys.argv[1]
-csv_filename = sys.argv[2]
-snp_filename = sys.argv[3]
+h5_filename = "test.h5"
+csv_filename = "test_out.csv"
+snp_filename = "output.snp"
 
 # Let's make the pmodl file optional...
 try:
-    pmodl_filename = sys.argv[4]
+    pmodl_filename = "mdlpo.ctl"
     pmodl_file = open(pmodl_filename, "r")
 except IndexError:
     print "Warning! No pmodl file supplied, using a default zero one."
@@ -24,14 +24,14 @@ h5_file = h5py.File(h5_filename)
 csv_file = pd.read_csv(csv_filename, skipinitialspace=True)
 
 #TODO: make this not a raw_input thing, it's messy.
-channel_num = int(raw_input("Please enter the channel number: "))
-freq = float(raw_input("Enter the frequency (MHz) of the target: "))
-pol_selection = int(raw_input("1 for AUTxRef, 2 for RefXAUT: "))
+channel_num = 59
+freq = 11900.0  # MHz
+pol_selection = 1  # 1 for AxB, 2 for BxA.
 
 data_column = np.array(h5_file["Data/VisData"][:,channel_num,pol_selection,0]
                        + 1j*h5_file["Data/VisData"][:,channel_num,pol_selection,1])
 
-csv_timestamps = np.array(csv_file["Timestamp"])
+csv_timestamps = np.array(csv_file["Timestamp"])/1e3  # /1e3 because csv has timestamps in ms
 h5_timestamps = np.array(h5_file["Data/Timestamps"])
 
 
@@ -136,20 +136,38 @@ target.antenna = antenna
 
 # Interpolate CSV data onto RF data:
 az_interpolator = interpolate.interp1d(csv_timestamps, np.array(csv_file["Azim actual position"]), kind="cubic")
+#print az_interpolator._y_axis
+#print "CSV:\nMin: %.2f\nMax: %.2f" % (np.min(csv_timestamps), np.max(csv_timestamps))
 csv_az = az_interpolator(h5_timestamps)
 el_interpolator = interpolate.interp1d(csv_timestamps, np.array(csv_file["Elev actual position"]), kind="cubic")
 csv_el = el_interpolator(h5_timestamps)
 
 # TODO: Flagging. Don't have any of that yet.
 
+snp_timestamps = []
+snp_labels = []
+with open(snp_filename, "r") as snp_file:
+    for line in snp_file:
+        if line[:2] == "\"#":
+            snp_timestamps.append(int(line[2:12]))  # bit of a hack, as unix times are 10 digits long at the moment.
+            snp_labels.append(line.split(",")[1])
+
 # Find the right lines in the csv log file.
 with open("output_file.asc", "w") as output_file:
     output_file.write("#freq_MHz=%.4f\n" % freq)
-    output_file.write("#targetaz_deg=%.4f\n" % target_az)
-    output_file.write("#targetel_deg=%.4f\n" % target_el)
+    output_file.write("#targetaz_deg=%.4f\n" % np.degrees(target.azel(h5_timestamps[0])[0]))
+    output_file.write("#targetel_deg=%.4f\n" % np.degrees(target.azel(h5_timestamps[0])[1]))
+
+    snp_file_counter = 0
+    snp_file_tag = snp_labels[0]
     for i in range(len(h5_timestamps)):
         azel = np.degrees(antenna.pointing_model.reverse(np.radians(csv_az[i]),
                                                          np.radians(csv_el[i])))
-        output_file.write("%.6f\t%.6f\t%.6f\t%.6f\t%.2f\n" %
-                          (azel[0] - target_az, azel[1] - target_el,
-                           np.abs(data_column[i]), np.degrees(np.angle(data_column[i])), h5_timestamps[i]))
+        while h5_timestamps[i] > snp_timestamps[snp_file_counter]:
+            snp_file_counter += 1
+
+        output_file.write("%.6f\t%.6f\t%.6f\t%.6f\t%.2f\t%s\n" %
+                          (azel[0] - np.degrees(target.azel(h5_timestamps[i])[0]),
+                           azel[1] - np.degrees(target.azel(h5_timestamps[i])[1]),
+                           np.abs(data_column[i]), np.degrees(np.angle(data_column[i])), h5_timestamps[i],
+                           snp_labels[snp_file_counter]))
