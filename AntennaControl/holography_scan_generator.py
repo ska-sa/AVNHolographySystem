@@ -41,8 +41,9 @@ def slew(start_az, start_el, stop_az, stop_el, slew_speed, plot=False, labeltext
     :type plotformat: str
     :return az
     :return el
-    
+
     """
+    # TODO finish the docstring.
     # Calculate distance, so that you can calculate the time.
     slew_distance = np.sqrt(np.square(stop_az - start_az) + np.square(stop_el - start_el))
     slew_time = int(np.floor(slew_distance / slew_speed)) + 1
@@ -63,6 +64,24 @@ def slew(start_az, start_el, stop_az, stop_el, slew_speed, plot=False, labeltext
 
     return az, el, t, labels
 
+
+def dwell(dwell_az, dwell_el, dwell_time, plot=False, labeltext="dwell", plotformat="b."):
+    """
+    Stay in one place for a while.
+
+    :param az:
+    :param el:
+    :param dwell_time:
+    :param plot:
+    :param labeltext:
+    :param plotformat:
+    :return:
+    """
+    az = np.ones(dwell_time) * dwell_az
+    el = np.ones(dwell_time) * dwell_el
+    t = np.ones(dwell_time)
+    labels = [labeltext] * dwell_time
+    return az, el, t, labels
 
 def generate_subscan(start_az, start_el, stop_az, stop_el, n_scans, scan_speed, slew_speed, settling_time, snake=True):
     # This is a place-holder.
