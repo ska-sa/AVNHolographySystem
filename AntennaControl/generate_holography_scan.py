@@ -2,23 +2,23 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as anim
 import time
-import calendar # for the one timegm function...
+import calendar  # for the one timegm function...
 import katpoint
 
 # Edit these before each run.
-satellite_name = "Eutelsat 7A"
-TLE = """EUTELSAT 7A
-1 28187U 04008A   18051.18726536  .00000042  00000-0  00000+0 0  9996
-2 28187   0.0701 342.3392 0003208 340.3981 261.7175  1.00271618 51105"""
+satellite_name = "SES-5"
+TLE = """SES-5
+1 38652C 12036A   18142.65625000  .00000124  00000-0  00000-0 0  1423
+2 38652   0.0271 263.9528 0001999 149.8080  67.7044  1.00269513    15"""
 antenna_str = "Kuntunse, 5:45:2.48, -0:18:17.92, 116, 32.0"
-raster_size_az = 4  # degrees
-raster_size_el = 4  # degrees
-start_time_input = "2018-03-01 14:00:00"
+raster_size_az = 1.5  # degrees
+raster_size_el = 1.5  # degrees
+start_time_input = "2018-05-23 10:53:00"
 output_filename = "output"
 
 
-def generate_raster(total_extent_az, total_extent_el, az_resolution=0.05, el_resolution=0.05, dwell_time=30,
-                    n_slew_points=5, slew_speed=0.02, scan_speed=0.01):
+def generate_raster(total_extent_az, total_extent_el, az_resolution=0.1, el_resolution=0.1, dwell_time=30,
+                    n_slew_points=5, slew_speed=0.02, scan_speed=0.02):
     """All angle values in degrees, speed values in degrees per second.
     """
 
