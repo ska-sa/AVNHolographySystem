@@ -10,8 +10,16 @@ TLE = """SES-5
 1 38652C 12036A   18142.65625000  .00000124  00000-0  00000-0 0  1423
 2 38652   0.0271 263.9528 0001999 149.8080  67.7044  1.00269513    15"""
 antenna_str = "Kuntunse, 5:45:2.48, -0:18:17.92, 116, 32.0"
-raster_size_az = 1.5  # degrees
-raster_size_el = 1.5  # degrees
+raster_size_az = 10.0  # degrees
+raster_size_el = 10.0  # degrees
+number_of_scans = 30
+scans_per_boresight = 5
+scan_speed = 0.01
+slew_speed = 0.01
+settling_time = 5
+boresight_time = 30
+snake = True
+plot = True
 start_time_input = "2018-05-23 20:30:00"
 output_filename = "output"
 
@@ -60,12 +68,12 @@ def slew(start_az, start_el, stop_az, stop_el, slew_speed, plot=False, labeltext
     labels = [labeltext] * slew_time
 
     if plot:
-        plt.plot(az, el, plotformat, label="slew")
+        plt.plot(az, el, plotformat, label=labeltext)
 
     return az, el, t, labels
 
 
-def dwell(dwell_az, dwell_el, dwell_time, plot=False, labeltext="dwell", plotformat="b."):
+def dwell(dwell_az, dwell_el, dwell_time, plot=False, labeltext="dwell", plotformat="b*"):
     """
     Stay in one place for a while.
 
@@ -81,24 +89,128 @@ def dwell(dwell_az, dwell_el, dwell_time, plot=False, labeltext="dwell", plotfor
     el = np.ones(dwell_time) * dwell_el
     t = np.ones(dwell_time)
     labels = [labeltext] * dwell_time
-    return az, el, t, labels
 
-def generate_subscan(start_az, start_el, stop_az, stop_el, n_scans, scan_speed, slew_speed, settling_time, snake=True):
-    # This is a place-holder.
-    az = np.array([start_az, stop_az])
-    el = np.array([start_el, stop_el])
-    t = [1, 2]
-    labels = ["foo", "bar"]
-    plt.plot(az, el)
+    if plot:
+        plt.plot(az, el, plotformat, label=labeltext)
 
     return az, el, t, labels
 
+
+def generate_subscan(start_az, start_el, stop_az, stop_el, n_scans, scan_speed, slew_speed, settling_time, snake=True,
+                     plot=False, debug=False):
+    # TODO: pattern looks okay, now include space for settling time.
+    if debug:
+        print "Generating subscan, from:"
+        print start_az, start_el
+        print "to:"
+        print stop_az, stop_el
+        print "\n"
+
+    az = np.array([])
+    el = np.array([])
+    t = np.array([])
+    labels = []  # Can normal Python lists be concatenated too?
+
+    if n_scans == 1:
+        slew(start_az, start_el, stop_az, start_el, scan_speed,
+             plot=plot, labeltext="scan", plotformat="g.")
+        # if snake:
+        #     slew(stop_az, start_el, stop_az, stop_el, scan_speed,
+        #                       plot=plot, labeltext="scan", plotformat="g.")
+        # else:
+        #     slew(stop_az, start_el, start_az, stop_el, scan_speed,
+        #          plot=plot, labeltext="scan", plotformat="g.")
+    else:
+        scan_spacing = (stop_el - start_el) / (n_scans - 1)
+
+        for i in range(n_scans):
+            if i % 2 == 0:
+                slew(start_az, start_el + i*(scan_spacing), stop_az, start_el + i*(scan_spacing), scan_speed,
+                              plot=plot, labeltext="scan", plotformat="g.")
+            else:
+                if snake:
+                    slew(stop_az, start_el + (i-1)*(scan_spacing), stop_az, start_el + i*(scan_spacing), slew_speed,
+                         plot=plot)  # This is a slew so default label stuff is fine.
+                    dwell(stop_az, start_el + i*(scan_spacing), settling_time, plot=plot, labeltext="settling")
+                    slew(stop_az, start_el + i*(scan_spacing), start_az, start_el + i*(scan_spacing), scan_speed,
+                              plot=plot, labeltext="scan", plotformat="g.")
+                    if i != (n_scans - 1):
+                        slew(start_az, start_el + i * (scan_spacing), start_az, start_el + (i + 1) * (scan_spacing), slew_speed,
+                         plot=plot)  # This is a slew so default label stuff is fine.
+                else:
+                    slew(stop_az, start_el + (i-1)*(scan_spacing), start_az, start_el + i*(scan_spacing), slew_speed,
+                         plot=plot)  # This is a slew so default label stuff is fine.
+                    slew(start_az, start_el + i*(scan_spacing), stop_az, start_el + i*(scan_spacing), scan_speed,
+                              plot=plot, labeltext="scan", plotformat="g.")
+                    if i != (n_scans - 1):
+                        slew(stop_az, start_el + i * (scan_spacing), start_az, start_el + (i + 1) * (scan_spacing), slew_speed,
+                         plot=plot)  # This is a slew so default label stuff is fine.
+
+    return az, el, t, labels
+
+def generate_boresight(start_az, start_el, stop_az, stop_el, slew_speed, settling_time, dwell_time, plot=False, debug=False):
+    if debug:
+        print "Generating boresight, from:"
+        print start_az, start_el
+        print "to:"
+        print stop_az, stop_el
+        print "\n"
+    az = np.array([])
+    el = np.array([])
+    t = np.array([])
+    labels = []  # Can normal Python lists be concatenated too?
+
+    slew(start_az, start_el, 0, 0, slew_speed, plot=plot)
+    dwell(0, 0, settling_time, plot=plot, labeltext="settling")
+    dwell(0, 0, dwell_time, plot=plot, labeltext="boresight")
+    slew(0, 0, stop_az, stop_el, slew_speed, plot=plot)
+
+    return az, el, t, labels
+
+
+def generate_holography_scan(az_extent, el_extent, num_scans, scans_per_boresight, scan_speed, slew_speed,
+                             settling_time, boresight_time, snake=True, plot=False):
+    az = np.array([])
+    el = np.array([])
+    t = np.array([])
+    labels = []  # Can normal Python lists be concatenated too?
+
+    scan_spacing = el_extent / (num_scans - 1)
+    num_subscans = int(np.floor(num_scans / scans_per_boresight))
+    subscan_sizing = scan_spacing * (scans_per_boresight - 1)
+    partial_subscan_size = num_scans % scans_per_boresight
+
+    sign = 1
+    if scans_per_boresight % 2 == 0:
+        sign = -1
+
+    # Corner case:
+    if scans_per_boresight == 1:
+        raise NotImplementedError("Haven't gotten to this corner case yet.")
+
+    i = 0
+    for i in range(num_subscans):
+        generate_subscan(-az_extent/2, -el_extent/2 + i*(subscan_sizing + scan_spacing),
+                         az_extent/2,  -el_extent/2 + (i + 1)*(subscan_sizing + scan_spacing) - scan_spacing,
+                         scans_per_boresight, scan_speed, slew_speed, settling_time, snake=snake, plot=plot)
+
+        if not (i == num_subscans - 1 and partial_subscan_size == 0):
+            generate_boresight(sign * az_extent/2,  -el_extent/2 + (i + 1)*(subscan_sizing + scan_spacing) - scan_spacing,
+                               -az_extent / 2, -el_extent / 2 + (i + 1) * (subscan_sizing + scan_spacing),
+                               slew_speed, settling_time, boresight_time, plot=plot)
+
+    if partial_subscan_size != 0:
+        generate_subscan(-az_extent/2, el_extent/2 - (partial_subscan_size - 1)*(scan_spacing),
+                         az_extent/2, el_extent/2, partial_subscan_size, scan_speed, slew_speed, settling_time,
+                         snake=snake, plot=plot)
+
+
+    return az, el, t, labels
 
 if __name__ == "__main__":
-    plt.figure()
-    generate_subscan(0, 0, 10, 2, 3, 1, 1, 1)
-    bar = slew(10, 2, 0, 3, 1, plot=True)
-    print bar
-    generate_subscan(0, 3, 10, 5, 3, 1, 1, 1)
 
+    generate_holography_scan(raster_size_az, raster_size_el, number_of_scans, scans_per_boresight,
+                             scan_speed, slew_speed, settling_time, boresight_time, snake, plot)
+
+    plt.grid()
     plt.show()
