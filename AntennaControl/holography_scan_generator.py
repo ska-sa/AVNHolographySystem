@@ -10,23 +10,23 @@ import katpoint
 # Edit these before each run.
 satellite_name = "SES-5"
 TLE = """SES-5
-1 38652C 12036A   18142.65625000  .00000124  00000-0  00000-0 0  1423
-2 38652   0.0271 263.9528 0001999 149.8080  67.7044  1.00269513    15"""
+1 38652U 12036A   18146.57916431  .00000021  00000-0  00000-0 0  9995
+2 38652   0.0240 269.8242 0002114 150.8080  36.9326  1.00270880 14993"""
 antenna_str = "Kuntunse, 5:45:2.48, -0:18:17.92, 116, 32.0"
-raster_size_az = 10.0  # degrees
-raster_size_el = 10.0  # degrees
-cross_scan_extent_az = 1.0
+raster_size_az = 15.0  # degrees
+raster_size_el = 2.5  # degrees
+cross_scan_extent_az = 6.0
 cross_scan_extent_el = 1.0
-number_of_scans = 30
+number_of_scans = 75
 scans_per_boresight = 5
-scan_speed = 0.01
-slew_speed = 0.01
-settling_time = 5
+scan_speed = 0.12
+slew_speed = 0.2
+settling_time = 15
 boresight_time = 30
 snake = True
-plot = False
-start_time_input = "2018-05-23 20:30:00"
-output_filename = "scan2"
+plot = True
+start_time_input = "2018-05-27 07:50:00"
+output_filename = "scan6"
 
 
 def slew(start_az, start_el, stop_az, stop_el, slew_speed, plot=False, labeltext="slew", plotformat="r."):
@@ -146,6 +146,13 @@ def generate_subscan(start_az, start_el, stop_az, stop_el, n_scans, scan_speed, 
     t = np.array([])
     labels = []  # Can normal Python lists be concatenated too?
 
+    cache = dwell(start_az, start_el,
+                  settling_time, plot=plot, labeltext="settling")
+    az = np.concatenate((az, cache[0]))
+    el = np.concatenate((el, cache[1]))
+    t = np.concatenate((t, cache[2]))
+    labels = labels + cache[3]
+
     # Corner case.
     if n_scans == 1:
         cache = slew(start_az, start_el,
@@ -249,6 +256,13 @@ def generate_subscan(start_az, start_el, stop_az, stop_el, n_scans, scan_speed, 
                         el = np.concatenate((el, cache[1]))
                         t = np.concatenate((t, cache[2]))
                         labels = labels + cache[3]
+
+    cache = dwell(stop_az, stop_el,
+                  settling_time, plot=plot, labeltext="settling")
+    az = np.concatenate((az, cache[0]))
+    el = np.concatenate((el, cache[1]))
+    t = np.concatenate((t, cache[2]))
+    labels = labels + cache[3]
 
     return az, el, t, labels
 
@@ -426,6 +440,7 @@ def generate_cross_scan(start_az, start_el, stop_az, stop_el, scan_extent_az, sc
     t = np.array([])
     labels = []
 
+    # If we start away from boresight, go there.
     if (start_az, start_el) != (0, 0):
         cache = slew(start_az, start_el,
                      0, 0,
@@ -441,12 +456,14 @@ def generate_cross_scan(start_az, start_el, stop_az, stop_el, scan_extent_az, sc
         t = np.concatenate((t, cache[2]))
         labels = labels + cache[3]
 
+    # Stare at boresight for a bit.
     cache = dwell(0, 0, boresight_time, plot=plot, labeltext="boresight")
     az = np.concatenate((az, cache[0]))
     el = np.concatenate((el, cache[1]))
     t = np.concatenate((t, cache[2]))
     labels = labels + cache[3]
 
+    # Slew to the start point, top of elev extent.
     cache = slew(0, 0,
                  0, scan_extent_el/2,
                  slew_speed, plot=plot)
@@ -455,12 +472,14 @@ def generate_cross_scan(start_az, start_el, stop_az, stop_el, scan_extent_az, sc
     t = np.concatenate((t, cache[2]))
     labels = labels + cache[3]
 
+    # Settle.
     cache = dwell(0, scan_extent_el/2, settling_time, plot=plot, labeltext="settling")
     az = np.concatenate((az, cache[0]))
     el = np.concatenate((el, cache[1]))
     t = np.concatenate((t, cache[2]))
     labels = labels + cache[3]
 
+    # Scan through to the bottom.
     cache = slew(0, scan_extent_el/2,
                  0, -scan_extent_el / 2,
                  scan_speed, plot=plot, labeltext="cross-scan", plotformat="g.")
@@ -469,12 +488,14 @@ def generate_cross_scan(start_az, start_el, stop_az, stop_el, scan_extent_az, sc
     t = np.concatenate((t, cache[2]))
     labels = labels + cache[3]
 
+    # Settle.
     cache = dwell(0, -scan_extent_el / 2, settling_time, plot, labeltext="settling")
     az = np.concatenate((az, cache[0]))
     el = np.concatenate((el, cache[1]))
     t = np.concatenate((t, cache[2]))
     labels = labels + cache[3]
 
+    # Go to the azimuth starting point.
     cache = slew(0, -scan_extent_el / 2,
                  -scan_extent_az/2, 0,
                  slew_speed, plot)
@@ -483,12 +504,14 @@ def generate_cross_scan(start_az, start_el, stop_az, stop_el, scan_extent_az, sc
     t = np.concatenate((t, cache[2]))
     labels = labels + cache[3]
 
+    # Settle.
     cache = dwell(-scan_extent_az/2, 0, settling_time, plot, labeltext="settlling")
     az = np.concatenate((az, cache[0]))
     el = np.concatenate((el, cache[1]))
     t = np.concatenate((t, cache[2]))
     labels = labels + cache[3]
 
+    # Scan through to the other side.
     cache = slew(-scan_extent_az/2, 0,
                  scan_extent_az/2, 0,
                  scan_speed, plot, labeltext="cross-scan", plotformat="g.")
@@ -497,12 +520,14 @@ def generate_cross_scan(start_az, start_el, stop_az, stop_el, scan_extent_az, sc
     t = np.concatenate((t, cache[2]))
     labels = labels + cache[3]
 
+    # Settle.
     cache = dwell(scan_extent_az/2, 0, settling_time, plot, labeltext="settling")
     az = np.concatenate((az, cache[0]))
     el = np.concatenate((el, cache[1]))
     t = np.concatenate((t, cache[2]))
     labels = labels + cache[3]
 
+    # Go to the ending point.
     cache = slew(scan_extent_az/2, 0,
                  stop_az, stop_el,
                  slew_speed, plot)
