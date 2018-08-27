@@ -136,10 +136,10 @@ class SubplotAnimation(animation.TimedAnimation):
             self.line_11_i, = self.ax_11_ri.plot([], [], color="magenta", label="imag")
 
         if True:
-            self.ax_00_m.set_xlim(650, 660)
-            self.ax_01_m.set_xlim(650, 660)
-            self.ax_10_m.set_xlim(650, 660)
-            self.ax_11_m.set_xlim(650, 660)
+            self.ax_00_m.set_xlim(600, 700)
+            self.ax_01_m.set_xlim(600, 700)
+            self.ax_10_m.set_xlim(600, 700)
+            self.ax_11_m.set_xlim(600, 700)
 
         if False:
             self.ax_00_m.set_xlim(0, 2048)

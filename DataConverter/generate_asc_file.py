@@ -1,14 +1,15 @@
 import h5py
 import numpy as np
 import pandas as pd
-import sys
 import katpoint
 import scipy.interpolate as interpolate
+import matplotlib.pyplot as plt
 
 # Filenames from arguments
-h5_filename = "test.h5"
-csv_filename = "test_out.csv"
-snp_filename = "output.snp"
+
+h5_filename = "scan1.h5"
+csv_filename = "scan1.csv"
+snp_filename = "scan1.snp"
 
 # Let's make the pmodl file optional...
 try:
@@ -23,17 +24,19 @@ except IOError:
 h5_file = h5py.File(h5_filename)
 csv_file = pd.read_csv(csv_filename, skipinitialspace=True)
 
-#TODO: make this not a raw_input thing, it's messy.
-channel_num = 59
-freq = 11900.0  # MHz
+channel_num = 657
+freq = 11700.25
 pol_selection = 1  # 1 for AxB, 2 for BxA.
+
 
 data_column = np.array(h5_file["Data/VisData"][:,channel_num,pol_selection,0]
                        + 1j*h5_file["Data/VisData"][:,channel_num,pol_selection,1])
 
-csv_timestamps = np.array(csv_file["Timestamp"])/1e3  # /1e3 because csv has timestamps in ms
-h5_timestamps = np.array(h5_file["Data/Timestamps"])
 
+csv_timestamps = np.array(csv_file["Timestamp"])/1e3  # /1e3 because csv has timestamps in ms
+print np.min(csv_timestamps), np.max(csv_timestamps)
+h5_timestamps = np.array(h5_file["Data/Timestamps"])
+print np.min(h5_timestamps), np.max(h5_timestamps)
 
 # This cut straight from my previous Katdal work.
 # Should probably get around to modularising that properly.
@@ -126,23 +129,53 @@ antenna_str = "ant1, 5:45:2.48, -0:18:17.92, 116, 32.0, 0 0 0, %s" % (pmodl_set[
 pmodl_set = np.array(pmodl_set[1:]).transpose()
 antenna = katpoint.Antenna(antenna_str)
 satellite_name = "Eutelsat 7A"
-TLE = """EUTELSAT 7A
-1 28187U 04008A   18051.18726536  .00000042  00000-0  00000+0 0  9996
-2 28187   0.0701 342.3392 0003208 340.3981 261.7175  1.00271618 51105"""
+TLE = """SES-5
+1 38652C 12036A   18142.65625000  .00000124  00000-0  00000-0 0  1423
+2 38652   0.0271 263.9528 0001999 149.8080  67.7044  1.00269513    15"""
 target = katpoint.Target("%s, tle, %s" % (satellite_name, TLE))
 target.antenna = antenna
 
 # TODO: check for limits.
 
 # Interpolate CSV data onto RF data:
-az_interpolator = interpolate.interp1d(csv_timestamps, np.array(csv_file["Azim actual position"]), kind="cubic")
-#print az_interpolator._y_axis
-#print "CSV:\nMin: %.2f\nMax: %.2f" % (np.min(csv_timestamps), np.max(csv_timestamps))
-csv_az = az_interpolator(h5_timestamps)
-el_interpolator = interpolate.interp1d(csv_timestamps, np.array(csv_file["Elev actual position"]), kind="cubic")
-csv_el = el_interpolator(h5_timestamps)
+az_desired_interpolator = interpolate.interp1d(csv_timestamps, np.array(csv_file["Azim desired position"]), kind="cubic")
+csv_az_desired = az_desired_interpolator(h5_timestamps)
+el_desired_interpolator = interpolate.interp1d(csv_timestamps, np.array(csv_file["Elev desired position"]), kind="cubic")
+csv_el_desired = el_desired_interpolator(h5_timestamps)
 
-# TODO: Flagging. Don't have any of that yet.
+az_actual_interpolator = interpolate.interp1d(csv_timestamps, np.array(csv_file["Azim actual position"]), kind="cubic")
+csv_az_actual = az_actual_interpolator(h5_timestamps)
+el_actual_interpolator = interpolate.interp1d(csv_timestamps, np.array(csv_file["Elev actual position"]), kind="cubic")
+csv_el_actual = el_actual_interpolator(h5_timestamps)
+
+
+target_position_az = []
+target_position_el = []
+
+corrected_csv_az_desired = []
+corrected_csv_el_desired = []
+corrected_csv_az_actual = []
+corrected_csv_el_actual = []
+for i in range(len(h5_timestamps)):
+    target_position_az.append(np.degrees(target.azel(h5_timestamps[i])[0]))
+    target_position_el.append(np.degrees(target.azel(h5_timestamps[i])[1]))
+
+    azel = np.degrees(antenna.pointing_model.reverse(np.radians(csv_az_desired[i]),
+                                                     np.radians(csv_el_desired[i])))
+    corrected_csv_az_desired.append(azel[0])
+    corrected_csv_el_desired.append(azel[1])
+
+    azel = np.degrees(antenna.pointing_model.reverse(np.radians(csv_az_actual[i]),
+                                                     np.radians(csv_el_actual[i])))
+    corrected_csv_az_actual.append(azel[0])
+    corrected_csv_el_actual.append(azel[1])
+
+#plt.plot(corrected_csv_az_desired, corrected_csv_el_desired, label="desired")
+plt.plot(corrected_csv_az_actual, corrected_csv_el_actual, label="actual")
+plt.plot(target_position_az, target_position_el, 'r.', label="target")
+plt.legend()
+plt.grid()
+plt.show()
 
 snp_timestamps = []
 snp_labels = []
@@ -160,14 +193,18 @@ with open("output_file.asc", "w") as output_file:
 
     snp_file_counter = 0
     snp_file_tag = snp_labels[0]
+
     for i in range(len(h5_timestamps)):
-        azel = np.degrees(antenna.pointing_model.reverse(np.radians(csv_az[i]),
-                                                         np.radians(csv_el[i])))
-        while h5_timestamps[i] > snp_timestamps[snp_file_counter]:
-            snp_file_counter += 1
+        azel = np.degrees(antenna.pointing_model.reverse(np.radians(csv_az_actual[i]),
+                                                         np.radians(csv_el_actual[i])))
+        try:
+            while h5_timestamps[i] > snp_timestamps[snp_file_counter]:
+                snp_file_counter += 1
+        except IndexError:
+            snp_file_counter -= 1
 
         output_file.write("%.6f\t%.6f\t%.6f\t%.6f\t%.2f\t%s\n" %
                           (azel[0] - np.degrees(target.azel(h5_timestamps[i])[0]),
                            azel[1] - np.degrees(target.azel(h5_timestamps[i])[1]),
                            np.abs(data_column[i]), np.degrees(np.angle(data_column[i])), h5_timestamps[i],
-                           snp_labels[snp_file_counter]))
+                           snp_labels[snp_file_counter - 1]))

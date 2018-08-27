@@ -2,23 +2,23 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as anim
 import time
-import calendar # for the one timegm function...
+import calendar  # for the one timegm function...
 import katpoint
 
 # Edit these before each run.
-satellite_name = "Eutelsat 7A"
-TLE = """EUTELSAT 7A
-1 28187U 04008A   18051.18726536  .00000042  00000-0  00000+0 0  9996
-2 28187   0.0701 342.3392 0003208 340.3981 261.7175  1.00271618 51105"""
+satellite_name = "SES-5"
+TLE = """SES-5
+1 38652C 12036A   18142.65625000  .00000124  00000-0  00000-0 0  1423
+2 38652   0.0271 263.9528 0001999 149.8080  67.7044  1.00269513    15"""
 antenna_str = "Kuntunse, 5:45:2.48, -0:18:17.92, 116, 32.0"
-raster_size_az = 4  # degrees
-raster_size_el = 4  # degrees
-start_time_input = "2018-03-01 14:00:00"
+raster_size_az = 1.5  # degrees
+raster_size_el = 1.5  # degrees
+start_time_input = "2018-05-23 20:30:00"
 output_filename = "output"
 
 
-def generate_raster(total_extent_az, total_extent_el, az_resolution=0.05, el_resolution=0.05, dwell_time=30,
-                    n_slew_points=5, slew_speed=0.02, scan_speed=0.01):
+def generate_raster(total_extent_az, total_extent_el, az_resolution=0.1, el_resolution=0.1, dwell_time=30,
+                    n_slew_points=5, slew_speed=0.02, scan_speed=0.02):
     """All angle values in degrees, speed values in degrees per second.
     """
 
@@ -41,7 +41,7 @@ def generate_raster(total_extent_az, total_extent_el, az_resolution=0.05, el_res
     time_points = np.array([dwell_time])
     label = ["track"]
 
-    # Numpy arrays don't have an append() fundction so concatenate is the next best thing.
+    # Numpy arrays don't have an append() function so concatenate is the next best thing.
     # Not great from a performance perspective, but it's a small script so it should be fine.
     for ui in range(n_scans):
         # Slew to the start of the next scan
@@ -96,6 +96,24 @@ if __name__ == "__main__":
     myTarget.antenna = antenna
     d_az, d_el, t, comment = generate_raster(raster_size_az, raster_size_el)
 
+    # plt.plot(np.diff(t))
+    # plt.plot(t)
+    # plt.show()
+
+    target_position_az = []
+    target_position_el = []
+    for i in range(len(t)):
+        target_position_az.append(np.degrees(myTarget.azel(start_time + t[i])[0]))
+        target_position_el.append(np.degrees(myTarget.azel(start_time + t[i])[1]))
+
+    fig = plt.figure()
+    ax1 = fig.add_subplot(111)
+    #ax2 = ax1.twinx()
+    ax1.plot(target_position_az + d_az, target_position_el + d_el, 'b')
+    ax1.plot(target_position_az, target_position_el, 'r')
+    #ax2.plot(t, target_position_el + d_el, 'b.')
+    plt.show()
+
     x, y = [], []
 
     with open("%s.snp" % output_filename, "w") as output_file:
@@ -114,8 +132,13 @@ if __name__ == "__main__":
                                time.strftime("%Y.%j.%H:%M:%S", time.gmtime(start_time + t[i])),
                                np.degrees(myTarget.azel(start_time + t[i])[0]) + d_az[i],
                                np.degrees(myTarget.azel(start_time + t[i])[1]) + d_el[i]))
+
             xy = myTarget.sphere_to_plane(np.radians(myTarget.azel(start_time + t[i])[0] + d_az[i]),
                                           np.radians(myTarget.azel(start_time + t[i])[1] + d_el[i]))
             x.append(np.degrees(xy[0]))
             y.append(np.degrees(xy[1]))
         output_file.write("stop")
+
+    if False:
+        plt.plot(d_az, d_el)
+        plt.show()
